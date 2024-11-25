@@ -1,0 +1,6 @@
+*.log
+*.ini
+logs/*
+.vscode/*
+.vscode/
+.DS_Store

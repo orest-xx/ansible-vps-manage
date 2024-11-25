@@ -1,0 +1,4 @@
+[nodes]
+<hostname> ansible_host=<ip> ansible_user=<user> ansible_port=<22 or any>
+[gaia_nodes]
+<hostname> ansible_host=<ip> ansible_user=<user> ansible_port=<22 or any>

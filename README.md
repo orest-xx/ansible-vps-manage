@@ -33,8 +33,8 @@ The playbook performs the following tasks:
 If the playbook is part of a larger repository, you can clone the repo to your machine:
 
 ```bash
-git clone https://github.com/your-repo/gaianet-ansible.git
-cd gaianet-ansible
+git clone https://github.com/your-repo/ansible-vps-manage.git
+cd ansible-vps-manage
 ```
 
 ### 2. Edit the Inventory File
