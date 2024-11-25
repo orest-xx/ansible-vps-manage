@@ -1,0 +1,206 @@
+---
+- name: Install and configure GaiaNet node with additional steps
+  hosts: gaia_nodes
+  become: true
+  vars:
+    # Default value for API URL in case the node_id is not found
+    api_url: "https://default_node_id.us.gaianet.network/v1/chat/completions"
+
+  tasks:
+
+    # Step 1: Update system packages (non-interactive to avoid prompts)
+    - name: Update system packages
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600  # Keep cache for an hour
+        force_apt_get: yes  # Forces apt-get to run without asking for input
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    # Step 2: Install required dependencies (non-interactive to avoid reboot prompts)
+    - name: Install curl
+      apt:
+        name: curl
+        state: present
+        force_apt_get: yes  # Forces apt-get to run without asking for input
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Install jq
+      apt:
+        name: jq
+        state: present
+        force_apt_get: yes  # Forces apt-get to run without asking for input
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Install git
+      apt:
+        name: git
+        state: present
+        force_apt_get: yes  # Forces apt-get to run without asking for input
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Install nano
+      apt:
+        name: nano
+        state: present
+        force_apt_get: yes  # Forces apt-get to run without asking for input
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Install screen
+      apt:
+        name: screen
+        state: present
+        force_apt_get: yes  # Forces apt-get to run without asking for input
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Check if gaianet is installed
+      command: which gaianet
+      register: gaianet_installed
+      ignore_errors: true  # Ignore errors, as gaianet might not be installed yet
+
+    - name: Install GaiaNet if not installed
+      shell: |
+        curl -sSfL 'https://github.com/GaiaNet-AI/gaianet-node/releases/latest/download/install.sh' | bash
+      when: gaianet_installed.rc != 0  # Only run the install if gaianet is not found
+
+    - name: Source ~/.bashrc to load the environment variables
+      shell: |
+        bash -l -c 'source ~/.bashrc'
+      become: yes
+      environment:
+        HOME: "{{ ansible_env.HOME }}"  # Ensure to use the correct user home directory
+
+    - name: Check user executing the playbook
+      shell: echo $USER
+      become: yes
+      register: result
+
+    - name: Display the current user
+      debug:
+        var: result.stdout
+
+    - name: Ensure GaiaNet is in PATH for the current session
+      shell: |
+        export PATH=$PATH:/root/gaianet/bin
+      environment:
+        HOME: "{{ ansible_env.HOME }}"  # Ensure to use the correct user home directory
+
+    - name: Initialize GaiaNet node with stable LM config
+      shell: |
+        bash -c "gaianet init --config https://raw.githubusercontent.com/GaiaNet-AI/node-configs/main/qwen2-0.5b-instruct/config.json"
+      args:
+        creates: /etc/gaianet/config.json  # Prevent running if already initialized
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/root/gaianet/bin"  # Make sure gaianet is in the PATH
+
+
+    # Step 6: Start GaiaNet node (non-interactive)
+    - name: Start GaiaNet node
+      shell: |
+        gaianet start
+      args:
+        creates: /var/run/gaianet.pid  # Ensure GaiaNet is running (check for process file)
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/root/gaianet/bin"  # Make sure gaianet is in the PATH
+
+    # Step 7: Get GaiaNet node information and capture node_id
+    - name: Get GaiaNet node information
+      shell: |
+        gaianet info
+      register: gaianet_info
+      changed_when: false
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/root/gaianet/bin"  # Make sure gaianet is in the PATH
+
+    - name: Set node_id and device_id
+      set_fact:
+        node_id: "{{ gaianet_info.stdout | regex_search('Node ID: (\\S+)') | regex_replace('Node ID: ', '') | regex_replace('[\\x1b\\x9b][^m]*[m]', '') }}"
+        device_id: "{{ gaianet_info.stdout | regex_search('Device ID: (\\S+)') | regex_replace('Device ID: ', '') | regex_replace('[\\x1b\\x9b][^m]*[m]', '') }}"
+
+    - name: Debug node_id and device_id
+      debug:
+        msg:
+          - "Node ID: {{ node_id }}"
+          - "Device ID: {{ device_id }}"
+
+    - name: Ensure faker_session_v2 directory exists and clone gaianet repository
+      shell: |
+        mkdir -p ~/faker_session_v2 && cd ~/faker_session_v2 && git clone https://github.com/wizarsi/gaianet.git
+      args:
+        creates: ~/faker_session_v2/gaianet  # Ensure it's not cloned again if it already exists
+
+    - name: Kill existing faker_session_bash screen session if it exists
+      shell: |
+        screen -ls | grep faker_session_bash | awk '{print $1}' | xargs -I {} screen -S {} -X quit || true
+
+      ignore_errors: true  # Ignore errors if the session doesn't exist
+
+    - name: Start a new screen session and run bot with API_URL
+      shell: |
+        screen -dmS faker_session_bash bash -c "cd ~/faker_session_v2/gaianet && API_URL='https://{{ node_id }}.us.gaianet.network/v1/chat/completions' ./bot_gaia.sh"
+      async: 0
+      poll: 0
+
+    # Step 8: Export API URL using node_id
+    - name: Export API URL with node_id
+      shell: |
+        export API_URL="https://{{ node_id }}.us.gaianet.network/v1/chat/completions"
+        echo "API_URL is set to: $API_URL"
+      environment:
+        HOME: "{{ ansible_env.HOME }}"  # Ensure to use the correct user home directory
+      register: api_url_output  # Capture the output of the shell task
+    
+    - name: Show the API URL in debug
+      debug:
+        msg: "{{ api_url_output.stdout }}"
+
+    - name: Initialize bot with the API URL
+      shell: |
+        echo "Initializing bot with API URL: $API_URL"
+        ./bot_gaia.sh
+      args:
+        chdir: "{{ ansible_env.HOME }}/faker_session_v2/gaianet"
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/root/gaianet/bin"  # Make sure gaianet is in the PATH
+        API_URL: "https://{{ node_id }}.us.gaianet.network/v1/chat/completions"  # Directly pass the API_URL here
+      register: bot_run_result
+      retries: 3  # Retry a few times if the script is expected to take some time
+      delay: 10  # Delay between retries in seconds
+      until: bot_run_result.rc == 0  # Continue only if the exit code is 0 (successful run)
+
+    - name: Mark bot initialization as successful
+      debug:
+        msg: "Bot initialization with API URL {{ API_URL }} was successful!"
+      when: bot_run_result.rc == 0
+
+    # Step 10: Check if a reboot is required after updates
+    - name: Check if a reboot is required
+      command: /usr/bin/needs-restarting -r
+      register: reboot_required
+      ignore_errors: yes
+      changed_when: false
+
+    # Step 11: Reboot the system if required (we'll ignore reboot prompts)
+    - name: Reboot the system if required
+      reboot:
+        reboot_timeout: 600
+      when: reboot_required.rc == 1
+
+    # Step 12: Wait for the system to come back online after reboot
+    - name: Wait for the system to come back online after reboot
+      wait_for:
+        port: 22
+        host: "{{ ansible_host }}"
+        delay: 10
+        timeout: 300
+      when: reboot_required.rc == 1
+
+    # Step 13: Display GaiaNet information
+    - name: Display GaiaNet information
+      debug:
+        var: gaianet_info.stdout

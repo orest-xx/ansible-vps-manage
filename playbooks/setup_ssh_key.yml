@@ -1,0 +1,11 @@
+---
+- name: Distribute SSH key to multiple hosts
+  hosts: all
+  become: yes  # Use 'become' if you need root privileges
+  gather_facts: yes  # Skip gathering facts (for testing)
+  tasks:
+    - name: Copy SSH public key to remote hosts
+      ansible.builtin.authorized_key:
+        user: 'root'  # You can replace with 'root' or another user
+        state: present
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"

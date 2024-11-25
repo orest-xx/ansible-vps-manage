@@ -1,0 +1,18 @@
+---
+- name: Distribute SSH key to remote hosts
+  hosts: all
+  become: yes
+  tasks:
+    - name: Ensure the authorized_keys file exists
+      ansible.builtin.file:
+        path: "~/.ssh"
+        state: directory
+        mode: '0700'
+
+    - name: Copy the SSH public key to remote hosts
+      ansible.builtin.copy:
+        src: "~/.ssh/id_rsa.pub"
+        dest: "~/.ssh/authorized_keys"
+        mode: '0600'
+        owner: root
+        group: root

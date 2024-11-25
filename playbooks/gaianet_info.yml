@@ -1,0 +1,27 @@
+- name: GaiaNet node info
+  hosts: gaia_nodes
+  become: true
+  vars:
+    # Default value for API URL in case the node_id is not found
+    api_url: "https://default_node_id.us.gaianet.network/v1/chat/completions"
+
+  tasks:
+     # Step 7: Get GaiaNet node information and capture node_id
+    - name: Get GaiaNet node information
+      shell: |
+        gaianet info
+      register: gaianet_info
+      changed_when: false
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/root/gaianet/bin"  # Make sure gaianet is in the PATH
+
+    - name: Set node_id and device_id
+      set_fact:
+        node_id: "{{ gaianet_info.stdout | regex_search('Node ID: (\\S+)') | regex_replace('Node ID: ', '') | regex_replace('[\\x1b\\x9b][^m]*[m]', '') }}"
+        device_id: "{{ gaianet_info.stdout | regex_search('Device ID: (\\S+)') | regex_replace('Device ID: ', '') | regex_replace('[\\x1b\\x9b][^m]*[m]', '') }}"
+
+    - name: Debug node_id and device_id
+      debug:
+        msg:
+          - "Node ID: {{ node_id }}"
+          - "Device ID: {{ device_id }}"

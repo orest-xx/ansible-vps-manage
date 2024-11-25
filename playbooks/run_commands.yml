@@ -1,0 +1,6 @@
+---
+- name: Execute command on multiple hosts
+  hosts: nodes
+  tasks:
+    - name: Run uptime command
+      command: uptime
