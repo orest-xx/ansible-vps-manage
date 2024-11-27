@@ -25,138 +25,138 @@
     #     path: fake_disk.img
     #     state: absent
 
-    # - name: Create a new fake disk image
-    #   command: "dd if=/dev/zero of=fake_disk.img bs=1M count=15000"
-    #   when: ansible_mounts | selectattr('mount', 'equalto', '/mnt/fake_disk') | list == []
+    - name: Create a new fake disk image
+      command: "dd if=/dev/zero of=fake_disk.img bs=1M count=15000"
+      when: ansible_mounts | selectattr('mount', 'equalto', '/mnt/fake_disk') | list == []
 
       
-    # - name: Truncate the fake disk image to 15TB
-    #   command: "truncate -s 15T fake_disk.img"
+    - name: Truncate the fake disk image to 15TB
+      command: "truncate -s 15T fake_disk.img"
 
-    # - name: Setup loopback device for the fake disk image
-    #   command: "losetup -fP fake_disk.img"
-    #   register: losetup_output
-    #   become: yes
-    #   changed_when: false  # This doesn't change anything, it's just setting up the loop device
+    - name: Setup loopback device for the fake disk image
+      command: "losetup -fP fake_disk.img"
+      register: losetup_output
+      become: yes
+      changed_when: false  # This doesn't change anything, it's just setting up the loop device
 
-    # - name: Debug losetup output
-    #   debug:
-    #     msg: "losetup_output: {{ losetup_output.stdout }}"
-    #   when: losetup_output is defined
+    - name: Debug losetup output
+      debug:
+        msg: "losetup_output: {{ losetup_output.stdout }}"
+      when: losetup_output is defined
 
-    # - name: Verify loop devices
-    #   command: "losetup -a"
-    #   register: losetup_verification
-    #   changed_when: false
-    #   ignore_errors: true
+    - name: Verify loop devices
+      command: "losetup -a"
+      register: losetup_verification
+      changed_when: false
+      ignore_errors: true
 
-    # - name: Debug loop devices
-    #   debug:
-    #     msg: "{{ losetup_verification.stdout }}"
-    #   when: losetup_verification is defined    
+    - name: Debug loop devices
+      debug:
+        msg: "{{ losetup_verification.stdout }}"
+      when: losetup_verification is defined    
 
-    # - name: Format the fake disk as ext4 (only if loop0 is assigned)
-    #   command: "mkfs.ext4 /dev/loop0"
-    #   become: yes
-    #   when: "'loop0' in losetup_output.stdout"  # Check if loop0 is in the losetup output
-    #   ignore_errors: true  # Ignore errors if filesystem already exists
+    - name: Format the fake disk as ext4 (only if loop0 is assigned)
+      command: "mkfs.ext4 /dev/loop0"
+      become: yes
+      when: "'loop0' in losetup_output.stdout"  # Check if loop0 is in the losetup output
+      ignore_errors: true  # Ignore errors if filesystem already exists
 
-    # - name: Format the fake disk as ext4
-    #   command: mkfs.ext4 fake_disk.img
-    #   become: yes
-    #   when: ansible_mounts | selectattr('mount', 'equalto', '/mnt/fake_disk') | list == []
+    - name: Format the fake disk as ext4
+      command: mkfs.ext4 fake_disk.img
+      become: yes
+      when: ansible_mounts | selectattr('mount', 'equalto', '/mnt/fake_disk') | list == []
 
 
-    # - name: Ensure /mnt/fake_disk directory exists
-    #   file:
-    #     path: /mnt/fake_disk
-    #     state: directory
-    #   become: yes
+    - name: Ensure /mnt/fake_disk directory exists
+      file:
+        path: /mnt/fake_disk
+        state: directory
+      become: yes
 
-    # - name: Check if the disk is already mounted
-    #   command: mount | grep /mnt/fake_disk
-    #   register: mount_check
-    #   ignore_errors: yes
+    - name: Check if the disk is already mounted
+      command: mount | grep /mnt/fake_disk
+      register: mount_check
+      ignore_errors: yes
 
-    # - name: Mount the fake disk image if not mounted
-    #   command: mount -o loop fake_disk.img /mnt/fake_disk
-    #   when: mount_check.rc != 0  # Only mount if the disk is not already mounted
-    #   ignore_errors: yes
+    - name: Mount the fake disk image if not mounted
+      command: mount -o loop fake_disk.img /mnt/fake_disk
+      when: mount_check.rc != 0  # Only mount if the disk is not already mounted
+      ignore_errors: yes
 
-    # - name: Check if mount was successful
-    #   debug:
-    #     msg: "Mount Output: {{ mount_output.stderr }}"
-    #   when: mount_output is defined and mount_output.stderr is defined
+    - name: Check if mount was successful
+      debug:
+        msg: "Mount Output: {{ mount_output.stderr }}"
+      when: mount_output is defined and mount_output.stderr is defined
 
-    # - name: Debug loop devices after setup
-    #   debug:
-    #     msg: "{{ losetup_verification.stdout }}"
+    - name: Debug loop devices after setup
+      debug:
+        msg: "{{ losetup_verification.stdout }}"
 
-    # - name: Verify the disk mount
-    #   command: "df -h /mnt/fake_disk"
-    #   register: disk_status
-    #   changed_when: false
+    - name: Verify the disk mount
+      command: "df -h /mnt/fake_disk"
+      register: disk_status
+      changed_when: false
 
-    # - name: Debug loop devices
-    #   debug:
-    #     msg: "{{ disk_status.stdout }}"     
+    - name: Debug loop devices
+      debug:
+        msg: "{{ disk_status.stdout }}"     
 
-    # # Step 4: Reset machine-id, for vps, where machine-id is often cloned
-    # - name: Remove current machine-id
-    #   command: "rm -f /etc/machine-id"
+    # Step 4: Reset machine-id, for vps, where machine-id is often cloned
+    - name: Remove current machine-id
+      command: "rm -f /etc/machine-id"
 
-    # - name: Recreate system machine-id
-    #   command: "systemd-machine-id-setup"
+    - name: Recreate system machine-id
+      command: "systemd-machine-id-setup"
     
-    # - name: Display the new machine-id
-    #   command: "cat /etc/machine-id"
-    #   register: machine_id
-    #   changed_when: false
+    - name: Display the new machine-id
+      command: "cat /etc/machine-id"
+      register: machine_id
+      changed_when: false
 
-    # # Step 5: Update and upgrade the system
-    # - name: Update package lists
-    #   apt:
-    #     update_cache: yes
+    # Step 5: Update and upgrade the system
+    - name: Update package lists
+      apt:
+        update_cache: yes
 
-    # - name: Upgrade all installed packages
-    #   apt:
-    #     update_cache: yes  # Update the package cache
-    #     upgrade: yes  # Upgrade all packages
-    #     force_apt_get: yes  # Force apt-get to run without prompting
-    #     autoremove: yes  # Remove unnecessary packages
-    #     autoclean: yes  # Clean up any temporary files
-    #   become: yes
+    - name: Upgrade all installed packages
+      apt:
+        update_cache: yes  # Update the package cache
+        upgrade: yes  # Upgrade all packages
+        force_apt_get: yes  # Force apt-get to run without prompting
+        autoremove: yes  # Remove unnecessary packages
+        autoclean: yes  # Clean up any temporary files
+      become: yes
 
-    # # Step 6: Install Node.js and Rivalz CLI
-    # - name: Install Node.js
-    #   shell: |
-    #     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    #     apt install -y nodejs
-    #   register: nodejs_install
-    #   become: yes
+    # Step 6: Install Node.js and Rivalz CLI
+    - name: Install Node.js
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+        apt install -y nodejs
+      register: nodejs_install
+      become: yes
 
-    # - name: Verify Node.js installation
-    #   debug:
-    #     msg: "{{ nodejs_install.stdout }}"
+    - name: Verify Node.js installation
+      debug:
+        msg: "{{ nodejs_install.stdout }}"
       
-    # - name: Check if nodejs is installed
-    #   set_fact:
-    #     nodejs_installed: "{{ nodejs_install.stdout | regex_search('nodejs', ignorecase=True) is not none }}"
+    - name: Check if nodejs is installed
+      set_fact:
+        nodejs_installed: "{{ nodejs_install.stdout | regex_search('nodejs', ignorecase=True) is not none }}"
       
-    # - name: Display nodejs installation status
-    #   debug:
-    #     msg: "Node.js installed: {{ nodejs_installed }}"
+    - name: Display nodejs installation status
+      debug:
+        msg: "Node.js installed: {{ nodejs_installed }}"
       
-    # - name: Fail if nodejs installation failed
-    #   fail:
-    #     msg: "Node.js installation failed"
-    #   when: nodejs_installed is not true
+    - name: Fail if nodejs installation failed
+      fail:
+        msg: "Node.js installation failed"
+      when: nodejs_installed is not true
 
-    # - name: Install Rivalz Node CLI globally
-      # npm:
-      #   name: rivalz-node-cli
-      #   global: yes
-      #   version: "2.6.2"
+    - name: Install Rivalz Node CLI globally
+      npm:
+        name: rivalz-node-cli
+        global: yes
+        version: "2.6.2"
 
     # Step 7: Kill existing screen sessions with the same name
     - name: Kill any existing screen session named 'rivalz'

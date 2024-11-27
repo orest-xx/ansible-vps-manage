@@ -1,0 +1,72 @@
+- name: Set up Hemi Network
+  hosts: gaia_nodes
+  become: true
+  environment:
+    TERM: "dumb"
+
+  vars:
+    static_fee: 550
+    bfg_url: "wss://testnet.rpc.hemi.network/v1/ws/public"    
+  tasks:
+    # 1. Load node-specific JSON data from nodes.json
+    - name: Load node data from JSON
+      ansible.builtin.set_fact:
+        all_nodes_data: "{{ lookup('file', '../inventory/nodes.json') | from_json }}"
+
+    - name: Extract node data
+      ansible.builtin.set_fact:
+        node_data: "{{ all_nodes_data[inventory_hostname] }}"  
+
+    # 1. Download the Hemi Network tarball
+    - name: Download Hemi Network tarball
+      ansible.builtin.get_url:
+        url: https://github.com/hemilabs/heminetwork/releases/download/v0.5.0/heminetwork_v0.5.0_linux_amd64.tar.gz
+        dest: ~/heminetwork_v0.5.0_linux_amd64.tar.gz
+
+    # 2. Create the Hemi directory
+    - name: Create Hemi directory
+      ansible.builtin.file:
+        path: ~/hemi
+        state: directory
+        mode: '0755'
+
+    # 3. Extract the tarball into the Hemi directory
+    - name: Extract Hemi tarball
+      ansible.builtin.unarchive:
+        src: ~/heminetwork_v0.5.0_linux_amd64.tar.gz
+        dest: ~/hemi
+        remote_src: yes
+        extra_opts:
+          - --strip-components=1
+
+    # 4. Remove the tarball
+    - name: Remove Hemi tarball
+      ansible.builtin.file:
+        path: ~/heminetwork_v0.5.0_linux_amd64.tar.gz
+        state: absent
+
+    # 5. Generate the initial key file
+    - name: Generate the initial key file
+      ansible.builtin.shell:
+        cmd: ./keygen -secp256k1 -json -net="testnet" > popm-address.json
+        chdir: ~/hemi
+
+    # 6. Create JSON configuration dynamically from .ini file
+    - name: Generate popm-address.json from .ini file
+      ansible.builtin.template:
+        src: templates/hemi_template.json.j2
+        dest: ~/hemi/popm-address.json
+        owner: "{{ ansible_user }}"
+        mode: '0644'
+
+    # 7. Start the Hemi process in a screen session
+    - name: Start Hemi in screen
+      ansible.builtin.shell:
+        cmd: |
+          screen -dmS hemi bash -c "
+          export POPM_BTC_PRIVKEY={{ node_data.private_key }};
+          export POPM_STATIC_FEE={{ static_fee }};
+          export POPM_BFG_URL={{ bfg_url }};
+          ./popmd
+          "
+        chdir: ~/hemi
