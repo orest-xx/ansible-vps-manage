@@ -8,10 +8,10 @@
     static_fee: 550
     bfg_url: "wss://testnet.rpc.hemi.network/v1/ws/public"    
   tasks:
-    # 1. Load node-specific JSON data from nodes.json
+    # 1. Load node-specific JSON data from hemi_nodes.json
     - name: Load node data from JSON
       ansible.builtin.set_fact:
-        all_nodes_data: "{{ lookup('file', '../inventory/nodes.json') | from_json }}"
+        all_nodes_data: "{{ lookup('file', '../inventory/hemi_nodes.json') | from_json }}"
 
     - name: Extract node data
       ansible.builtin.set_fact:
@@ -70,3 +70,19 @@
           ./popmd
           "
         chdir: ~/hemi
+
+    # Добавленные задачи:
+    - name: Enable Hemi service
+      systemd:
+        name: hemi
+        enabled: true
+
+    - name: Reload systemd daemon
+      shell: systemctl daemon-reload
+      args:
+        warn: false
+
+    - name: Start Hemi service
+      systemd:
+        name: hemi
+        state: started

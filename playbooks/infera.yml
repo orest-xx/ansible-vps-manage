@@ -1,0 +1,33 @@
+---
+- name: Install and configure Infera
+  hosts: gaia_nodes
+  become: true
+  tasks:
+    - name: Run install.sh script in background
+      shell: |
+        nohup bash -c "curl -s https://raw.githubusercontent.com/wizarsi/inferon-setup/refs/heads/main/install_infera.sh | bash" > install.log 2>&1 &
+      async: 3600  # Maximum time to wait for script completion (1 hour)
+      poll: 0
+      register: install_output
+      ignore_errors: yes
+
+    - name: Wait for install script to finish
+      shell: grep -q "naming to docker.io/library/infera-app " install.log
+      register: log_check
+      retries: 30  # Maximum number of retries
+      delay: 20    # Wait 20 seconds between retries
+      until: log_check.rc == 0
+
+    - name: Ensure the install script completed successfully
+      fail:
+        msg: "Install script did not finish successfully. Final status: {{ install_status }}"
+      when: install_status.failed is defined and install_status.failed
+
+    - name: Display the install log
+      shell: cat install.log
+      register: install_log
+      ignore_errors: yes
+
+    - name: Debug install log output
+      debug:
+        var: install_log.stdout

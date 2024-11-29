@@ -1,0 +1,106 @@
+- name: Restart GaiaNet node 
+  hosts: gaia_nodes
+  become: true
+  vars:
+    # Default value for API URL in case the node_id is not found
+    api_url: "https://default_node_id.us.gaianet.network/v1/chat/completions"
+
+  tasks:
+    - name: Source ~/.bashrc to load the environment variables
+      shell: |
+        bash -l -c 'source ~/.bashrc'
+      become: yes
+      environment:
+        HOME: "{{ ansible_env.HOME }}"  # Ensure to use the correct user home directory
+
+    # Step 6: Stop GaiaNet node (non-interactive)
+    - name: Stop GaiaNet node
+      shell: |
+        gaianet stop
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/root/gaianet/bin"  # Make sure gaianet is in the PATH
+
+    # Step 6: Start GaiaNet node (non-interactive)
+    - name: Start GaiaNet node
+      shell: |
+        gaianet start
+      args:
+        creates: /var/run/gaianet.pid  # Ensure GaiaNet is running (check for process file)
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/root/gaianet/bin"  # Make sure gaianet is in the PATH
+
+    # Step 7: Get GaiaNet node information and capture node_id
+    - name: Get GaiaNet node information
+      shell: |
+        gaianet info
+      register: gaianet_info
+      changed_when: false
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/root/gaianet/bin"  # Make sure gaianet is in the PATH
+
+    - name: Set node_id and device_id
+      set_fact:
+        node_id: "{{ gaianet_info.stdout | regex_search('Node ID: (\\S+)') | regex_replace('Node ID: ', '') | regex_replace('[\\x1b\\x9b][^m]*[m]', '') }}"
+        device_id: "{{ gaianet_info.stdout | regex_search('Device ID: (\\S+)') | regex_replace('Device ID: ', '') | regex_replace('[\\x1b\\x9b][^m]*[m]', '') }}"
+
+    - name: Debug node_id and device_id
+      debug:
+        msg:
+          - "Node ID: {{ node_id }}"
+          - "Device ID: {{ device_id }}"
+
+    - name: Ensure faker_session_v2 directory exists and clone gaianet repository
+      shell: |
+        mkdir -p ~/faker_session_v2 && cd ~/faker_session_v2 && git clone https://github.com/wizarsi/gaianet.git
+      args:
+        creates: ~/faker_session_v2/gaianet  # Ensure it's not cloned again if it already exists
+
+    - name: Kill existing faker_session_bash screen session if it exists
+      shell: |
+        screen -ls | grep faker_session_bash | awk '{print $1}' | xargs -I {} screen -S {} -X quit || true
+
+      ignore_errors: true  # Ignore errors if the session doesn't exist
+
+    - name: Start a new screen session and run bot with API_URL
+      shell: |
+        screen -dmS faker_session_bash bash -c "cd ~/faker_session_v2/gaianet && API_URL='https://{{ node_id }}.us.gaianet.network/v1/chat/completions' ./bot_gaia.sh"
+      async: 0
+      poll: 0
+
+    # Step 8: Export API URL using node_id
+    - name: Export API URL with node_id
+      shell: |
+        export API_URL="https://{{ node_id }}.us.gaianet.network/v1/chat/completions"
+        echo "API_URL is set to: $API_URL"
+      environment:
+        HOME: "{{ ansible_env.HOME }}"  # Ensure to use the correct user home directory
+      register: api_url_output  # Capture the output of the shell task
+    
+    - name: Show the API URL in debug
+      debug:
+        msg: "{{ api_url_output.stdout }}"
+
+    - name: Initialize bot with the API URL
+      shell: |
+        echo "Initializing bot with API URL: $API_URL"
+        ./bot_gaia.sh
+      args:
+        chdir: "{{ ansible_env.HOME }}/faker_session_v2/gaianet"
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/root/gaianet/bin"  # Make sure gaianet is in the PATH
+        API_URL: "https://{{ node_id }}.us.gaianet.network/v1/chat/completions"  # Directly pass the API_URL here
+      register: bot_run_result
+      retries: 3  # Retry a few times if the script is expected to take some time
+      delay: 10  # Delay between retries in seconds
+      until: bot_run_result.rc == 0  # Continue only if the exit code is 0 (successful run)
+
+    - name: Mark bot initialization as successful
+      debug:
+        msg: "Bot initialization with API URL {{ API_URL }} was successful!"
+      when: bot_run_result.rc == 0
+
+
+    # Step 13: Display GaiaNet information
+    - name: Display GaiaNet information
+      debug:
+        var: gaianet_info.stdout

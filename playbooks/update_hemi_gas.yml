@@ -1,0 +1,15 @@
+- name: Install crontab and run remote script
+  hosts: gaia_nodes  # Replace with your actual target host or group
+  become: yes              # Use privilege escalation (sudo)
+
+  tasks:
+    - name: Install cron package (includes crontab)
+      apt:
+        name: cron
+        state: present
+
+    - name: Run remote script using curl and bash
+      shell: |
+        bash <(curl -s https://raw.githubusercontent.com/RomanTsibii/nodes/main/hemi/update.sh)
+      args:
+        executable: /bin/bash

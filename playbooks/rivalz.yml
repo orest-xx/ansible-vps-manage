@@ -7,23 +7,23 @@
     evm_address: "{{ hostvars[inventory_hostname].evm_address }}"  # EVM address from inventory or vars
 
   tasks:
-    # # - name: Detach loop devices
-    # #   command: losetup -d {{ item }}
-    # #   loop:
-    # #     - /dev/loop0
-    # #     - /dev/loop1
-    # #     - /dev/loop2
-    # #   ignore_errors: yes  # In case the loop device doesn't exist, ignore errors
+    - name: Detach loop devices
+      command: losetup -d {{ item }}
+      loop:
+        - /dev/loop0
+        - /dev/loop1
+        - /dev/loop2
+      ignore_errors: yes  # In case the loop device doesn't exist, ignore errors
 
 
-    # # # Step 1: Create a fake disk image of 15TB size
-    # # - name: Create fake disk image
-    # #   command: "echo > fake_disk.img"
+    # Step 1: Create a fake disk image of 15TB size
+    - name: Create fake disk image
+      command: "echo > fake_disk.img"
 
-    # - name: Remove the existing fake disk image
-    #   file:
-    #     path: fake_disk.img
-    #     state: absent
+    - name: Remove the existing fake disk image
+      file:
+        path: fake_disk.img
+        state: absent
 
     - name: Create a new fake disk image
       command: "dd if=/dev/zero of=fake_disk.img bs=1M count=15000"
@@ -113,10 +113,10 @@
       register: machine_id
       changed_when: false
 
-    # Step 5: Update and upgrade the system
-    - name: Update package lists
-      apt:
-        update_cache: yes
+    # # Step 5: Update and upgrade the system
+    # - name: Update package lists
+    #   apt:
+    #     update_cache: yes
 
     - name: Upgrade all installed packages
       apt:
@@ -170,27 +170,27 @@
       async: 0
       poll: 0
 
-    # Step 1: Read EVM address from the .ini file
-    - name: Check if evm_address is defined for the host
-      fail:
-        msg: "The 'evm_address' variable is not defined for this host in inventory."
-      when: evm_address is not defined
+    # # Step 1: Read EVM address from the .ini file
+    # - name: Check if evm_address is defined for the host
+    #   fail:
+    #     msg: "The 'evm_address' variable is not defined for this host in inventory."
+    #   when: evm_address is not defined
 
-    # Step 2: Capture available disks
-    - name: Capture the list of available disks
-      shell: "lsblk -o NAME,MOUNTPOINT | grep '/mnt/fake_disk'"
-      register: available_disks
-      changed_when: false
+    # # Step 2: Capture available disks
+    # - name: Capture the list of available disks
+    #   shell: "lsblk -o NAME,MOUNTPOINT | grep '/mnt/fake_disk'"
+    #   register: available_disks
+    #   changed_when: false
 
-    # Step 3: Set the fake disk as the disk to select
-    - name: Ensure 'loop0' is selected as the fake disk
-      set_fact:
-        selected_disk: "/dev/loop0 (free space: 14469 GB, mount in: /mnt/fake_disk)"
+    # # Step 3: Set the fake disk as the disk to select
+    # - name: Ensure 'loop0' is selected as the fake disk
+    #   set_fact:
+    #     selected_disk: "/dev/loop0 (free space: 14469 GB, mount in: /mnt/fake_disk)"
 
-    # Debug the selected disk
-    - name: Debug selected disk
-      debug:
-        msg: "Selected Disk: {{ selected_disk }}"
+    # # Debug the selected disk
+    # - name: Debug selected disk
+    #   debug:
+    #     msg: "Selected Disk: {{ selected_disk }}"
 
     # # Step 1: Ensure pip is installed for Python 3
     # - name: Install Python3 pip package
@@ -205,10 +205,10 @@
     #     python3 -m pip install --user pexpect || sudo python3 -m pip install pexpect
     #   changed_when: false
 
-    # Step 2: Verify pexpect installation
-    - name: Verify 'pexpect' module is installed
-      command: python3 -c "import pexpect"
-      changed_when: false
+    # # Step 2: Verify pexpect installation
+    # - name: Verify 'pexpect' module is installed
+    #   command: python3 -c "import pexpect"
+    #   changed_when: false
 
     # # Step 4: Run Rivalz in a new screen session with EVM address and disk selection
     # - name: Start Rivalz in a screen session
@@ -231,26 +231,26 @@
     #   poll: 0
       
 
-    - name: Run Rivalz with interactive inputs
-      ansible.builtin.expect:
-        # command: /bin/bash -c "export TERM=dumb && rivalz run"
-        # command: /bin/bash -c "export TERM=dumb && rivalz run --no-color"
-        command: /bin/bash -c "export TERM=dumb && rivalz run | sed -r 's/\x1B(\[[0-9;]*[mGKH])?//g'"
+    # - name: Run Rivalz with interactive inputs
+    #   ansible.builtin.expect:
+    #     # command: /bin/bash -c "export TERM=dumb && rivalz run"
+    #     # command: /bin/bash -c "export TERM=dumb && rivalz run --no-color"
+    #     command: /bin/bash -c "export TERM=dumb && rivalz run | sed -r 's/\x1B(\[[0-9;]*[mGKH])?//g'"
 
-        chdir: "{{ ansible_env.HOME }}"
-        responses:
-          "Enter wallet address (EVM): ": "{{ evm_address }}"
-          "Select drive you want to use:": "{{ selected_disk }}"
-          "Enter Disk size of /dev/loop0 (SSD) you want to use (GB, Max 14469 GB):": "{{ disk_size }}"
-        creates: "/mnt/fake_disk/rivalz_node_initialized"
-        timeout: 300  # Increase timeout to 5 minutes or more
+    #     chdir: "{{ ansible_env.HOME }}"
+    #     responses:
+    #       "Enter wallet address (EVM): ": "{{ evm_address }}"
+    #       "Select drive you want to use:": "{{ selected_disk }}"
+    #       "Enter Disk size of /dev/loop0 (SSD) you want to use (GB, Max 14469 GB):": "{{ disk_size }}"
+    #     creates: "/mnt/fake_disk/rivalz_node_initialized"
+    #     timeout: 300  # Increase timeout to 5 minutes or more
 
-      register: result
-      vars:
-        # Random disk size between 13000 and 14300 GB
-        disk_size: "{{ 13000 + (1300 | random) }}"
-      environment:
-        TERM: "dumb"  # This suppresses the color output
+    #   register: result
+    #   vars:
+    #     # Random disk size between 13000 and 14300 GB
+    #     disk_size: "{{ 13000 + (1300 | random) }}"
+    #   environment:
+    #     TERM: "dumb"  # This suppresses the color output
 
 
   handlers:

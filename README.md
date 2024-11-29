@@ -63,6 +63,14 @@ ansible-playbook -i inventory/inventory.ini playbooks/gaianet_setup.yml
 ansible-playbook -i inventory/inventory.ini playbooks/rivalz.yml
 
 ansible-playbook -i inventory/inventory.ini playbooks/hemi.yml
+
+ansible-playbook -i inventory/inventory.ini playbooks/update_hemi.yml
+
+ansible-playbook -i inventory/inventory.ini playbooks/update_gas.yml
+
+ansible-playbook -i inventory/inventory.ini playbooks/nillion.yml
+
+
 ```
 This will execute the playbook on all hosts defined in your inventory file under the gaia_nodes group.
 

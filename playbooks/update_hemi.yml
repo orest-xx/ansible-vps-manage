@@ -1,0 +1,34 @@
+- name: Deploy Hemi Miner
+  hosts: gaia_nodes
+  become: true
+
+  tasks:
+
+    - name: Kill existing hemi screen session if it exists
+      shell: |
+        screen -ls | grep hemi | awk '{print $1}' | xargs -I {} screen -S {} -X quit || true
+
+      ignore_errors: true  # Ignore errors if the session doesn't exist
+
+    - name: Load node data from JSON
+      ansible.builtin.set_fact:
+        all_nodes_data: "{{ lookup('file', '../inventory/hemi_nodes.json') | from_json }}"
+
+    - name: Extract node data
+      ansible.builtin.set_fact:
+        node_data: "{{ all_nodes_data[inventory_hostname] }}"
+
+    - name: Extract private key from node data
+      ansible.builtin.set_fact:
+        private_key: "{{ node_data.private_key }}"
+
+    - name: Copy install.sh to remote host
+      copy:
+        src: ./hemi_install.sh
+        dest: /tmp/install.sh
+        mode: '0755'
+
+    - name: Execute Hemi installation script
+      shell: PRIVATE_KEY={{ private_key }} bash /tmp/install.sh
+      args:
+        executable: /bin/bash

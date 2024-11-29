@@ -1,0 +1,74 @@
+---
+- name: Install and configure Nillion
+  hosts: gaia_nodes
+  become: true
+  tasks:
+    # 1. Load node-specific JSON data from nodes.json
+    - name: Load node data from JSON
+      ansible.builtin.set_fact:
+        all_nodes_data: "{{ lookup('file', '../inventory/nillion_nodes.json') | from_json }}"
+
+    - name: Extract node data
+      ansible.builtin.set_fact:
+        node_data: "{{ all_nodes_data[inventory_hostname] }}"  
+
+    - name: Run install.sh script in background
+      shell: |
+        nohup bash -c "curl -s https://raw.githubusercontent.com/RomanTsibii/nodes/main/nillion/install.sh | bash" > install.log 2>&1 &
+      async: 3600  # Maximum time to wait for script completion (1 hour)
+      poll: 0
+      register: install_output
+      ignore_errors: yes
+
+    - name: Wait for install script to finish
+      shell: grep -q "Verifier public key" install.log
+      register: log_check
+      retries: 3  # Maximum number of retries
+      delay: 60    # Wait 60 seconds between retries
+      until: log_check.rc == 0
+
+    - name: Ensure the install script completed successfully
+      fail:
+        msg: "Install script did not finish successfully. Final status: {{ install_status }}"
+      when: install_status.failed is defined and install_status.failed
+
+    - name: Display the install log
+      shell: cat install.log
+      register: install_log
+      ignore_errors: yes
+
+    - name: Debug install log output
+      debug:
+        var: install_log.stdout
+
+    - name: Remove old credentials.json files (if any)
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "nillion/accuser/credentials.json"
+        - "nillion/verifier/credentials.json"
+
+    - name: Load Nillion node data from nillion_nodes.json
+      ansible.builtin.set_fact:
+        all_nodes_data: "{{ lookup('file', '../inventory/nillion_nodes.json') | from_json }}"
+
+    # 6. Create JSON configuration dynamically from .ini file
+    - name: Generate nillion/accuser/credentials.json
+      ansible.builtin.template:
+        src: templates/nillion_template.json.j2
+        dest: nillion/accuser/credentials.json
+        owner: "{{ ansible_user }}"
+        mode: '0600'
+
+    # 6. Create JSON configuration dynamically from .ini file
+    - name: Generate nillion/verifier/credentials.json 
+      ansible.builtin.template:
+        src: templates/nillion_template.json.j2
+        dest: nillion/verifier/credentials.json
+        owner: "{{ ansible_user }}"
+        mode: '0600'
+
+    # 7. Restart docker contrainer nillion
+    - name: Restart Nillion Docker container
+      command: docker restart nillion
