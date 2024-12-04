@@ -1,0 +1,57 @@
+- name: Install and Configure Sonaric
+  hosts: gaia_nodes
+  become: true
+  vars:
+    passphrase: "metamask_108"
+  tasks:
+      # Step 1: Rename the node using the sonaric command
+    - name: Rename the Sonaric node
+      shell: echo "{{ inventory_hostname }}" | sonaric node-rename
+      register: node_rename_output
+      become: true
+      become_user: root
+
+
+    # - name: Execute sonaric configuration script
+    #   copy:
+    #     content: |
+    #       #!/bin/bash
+    #       sonaric node-rename <<EOF
+    #       {{ inventory_hostname }}
+    #       EOF
+          
+    #       sonaric identity-export <<EOF
+    #       {{ passphrase }}
+    #       {{ passphrase }}
+    #       EOF
+    #     dest: /tmp/run_sonaric.sh
+    #     mode: '0755'
+
+    # - name: Run sonaric configuration script
+    #   shell: "/bin/bash /tmp/run_sonaric.sh"
+    #   register: sonaric_output
+    #   ignore_errors: true
+
+    # - name: Debug Script Output
+    #   debug:
+    #     var: sonaric_output.stdout
+    # - name: Copy the expect script to the remote host
+    #   copy:
+    #     content: |
+    #       #!/usr/bin/expect -f
+    #       set timeout 60
+    #       spawn sonaric node-rename
+    #       expect "The new `NAME' of the peer"
+    #       send -- "{{ inventory_hostname }}\r"
+    #       expect eof
+    #     dest: /tmp/node_rename.exp
+    #     mode: '0755'
+
+    # - name: Execute node rename using expect script
+    #   shell: "/usr/bin/expect /tmp/node_rename.exp"
+    #   register: rename_output
+    #   ignore_errors: true
+
+    # - name: Debug Rename Execution Output
+    #   debug:
+    #     var: rename_output.stdout

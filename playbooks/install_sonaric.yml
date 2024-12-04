@@ -1,0 +1,62 @@
+- name: Install and Configure Sonaric
+  hosts: ubuntu22
+  become: true
+  vars:
+    passphrase: "Your_pass_#"
+  tasks:
+    - name: Copy local install_sonaric.sh to remote host
+      ansible.builtin.copy:
+        src: "./install_sonaric.sh"
+        dest: "/tmp/install_sonaric.sh"
+        mode: '0755'
+
+    - name: Execute Sonaric installation script with parameters
+      shell: "bash /tmp/install_sonaric.sh '{{ inventory_hostname }}' '{{ passphrase }}'"
+      register: script_output
+      ignore_errors: true  # This allows continued execution even if errors occur
+      # args:
+      #   timeout: 600  # Timeout set to 360 seconds (6 minutes)
+
+
+    - name: Debug script output to check for installed output
+      debug:
+        var: script_output.stdout
+
+    - name: Extract the secret from script output
+      set_fact:
+        secret_code: "{{ script_output.stdout | regex_search('SecretCaptured: \\{[^}]*\\}') | regex_replace('SecretCaptured: ', '') | default('No secret found') }}"
+      
+    - name: Output the secret code
+      debug:
+        var: secret_code
+
+    # - name: Rename the Sonaric node
+    #   expect:
+    #     command: "sonaric node-rename"
+    #     responses:
+    #       "(?i)The new `NAME' of the peer": "{{ inventory_hostname }}"
+    #     timeout: 30
+    #   register: rename_output
+    #   ignore_errors: true
+
+    # - name: Output rename result
+    #   debug:
+    #     var: rename_output.stdout        
+
+    # - name: Export identity and set passphrase
+    #   expect:
+    #     command: "sonaric identity-export"
+    #     responses:
+    #       "(?i)Pick a secure passphrase to encrypt your identity file": "{{ passphrase }}"
+    #       "(?i)Confirm a secure passphrase": "{{ passphrase }}"
+    #     timeout: 300
+    #   register: export_output
+    #   ignore_errors: true
+
+    # - name: Extract the secret code from export output
+    #   set_fact:
+    #     secret_code: "{{ export_output.stdout | regex_search('\\{[^}]*\\}') | first }}"
+        
+    # - name: Output the secret code
+    #   debug:
+    #     var: secret_code    

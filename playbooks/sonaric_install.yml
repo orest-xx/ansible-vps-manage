@@ -1,0 +1,34 @@
+- name: Install and Configure Sonaric
+  hosts: ubuntu22
+  become: true  # Run tasks as root (sudo)
+  vars:
+    install_script_url: "http://get.sonaric.xyz/scripts/install.sh"
+    passphrase: "Your_pass_#"
+
+  tasks:
+
+    - name: Copy local install_sonaric.sh to remote host
+      ansible.builtin.copy:
+        src: "./sonaric_install.sh"
+        dest: "/tmp/sonaric_install.sh"
+        mode: '0755'
+
+    - name: Ensure NODE_NAME and PASSPHRASE are set
+      set_fact:
+        NODE_NAME: "{{inventory_hostname}}"
+        PASSPHRASE: "{{passphrase}}"
+
+    - name: Run the Sonaric installation script and capture output
+      shell: NODE_NAME={{ inventory_hostname }} PASSPHRASE={{passphrase}} bash /tmp/sonaric_install.sh
+      register: sonaric_install_output
+      changed_when: False
+      args:
+        executable: /bin/bash
+   
+    - name: Extract the secret from installation output
+      set_fact:
+        sonaric_secret: "{{ sonaric_install_output.stdout | regex_search('\\{[^}]+\\}', '\\0') }}"
+
+    - name: Show captured secret
+      debug:
+        msg: "Captured secret: {{ sonaric_secret }}"
